@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>中文 Reader · 三体</title>
+<meta name="theme-color" content="#4f6df5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 
 <style>
 *{box-sizing:border-box}
@@ -233,12 +238,27 @@ header{
 .type-badge{
   display:inline-block;
   margin-top:7px;
-  padding:3px 7px;
+  padding:4px 8px;
   border-radius:999px;
   font-size:11px;
-  font-weight:800;
+  font-weight:850;
   background:#f1edff;
   color:#7047d7;
+}
+
+.type-badge.expression{
+  background:#e8f4ff;
+  color:#26639a;
+}
+
+.type-badge.collocation{
+  background:#eaf8ee;
+  color:#2f7a49;
+}
+
+.type-badge.colloquial{
+  background:#fff2df;
+  color:#9a5c13;
 }
 
 .small-icon-btn{
@@ -299,13 +319,25 @@ header{
 .tooltip-type{
   display:none;
   width:max-content;
+  max-width:100%;
   margin-top:9px;
-  padding:4px 8px;
+  padding:5px 9px;
   border-radius:999px;
   background:#5e43b6;
   color:#fff;
   font-size:11px;
   font-weight:850;
+}
+
+.tooltip-note{
+  display:none;
+  margin-top:9px;
+  padding:9px 10px;
+  border-radius:10px;
+  background:rgba(255,255,255,.10);
+  color:#dce5f2;
+  font-size:12px;
+  line-height:1.45;
 }
 
 .audio-mini{
@@ -530,10 +562,47 @@ header{
     grid-template-columns:1fr;
   }
 }
+
+.word.auto-word{
+  text-decoration:underline dotted #b9c1cf;
+  text-underline-offset:4px;
+}
+.auth-overlay{
+  position:fixed;inset:0;z-index:5000;background:rgba(244,246,250,.96);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.auth-overlay.hidden{display:none}
+.auth-card{width:min(430px,100%);background:#fff;border:1px solid var(--border);border-radius:20px;padding:26px;box-shadow:0 12px 40px rgba(0,0,0,.12)}
+.auth-card h2{margin:0 0 8px}
+.auth-card p{color:var(--muted);line-height:1.5}
+.auth-card input{width:100%;padding:13px 14px;margin:6px 0;border:1px solid var(--border);border-radius:11px;font-size:16px}
+.auth-actions{display:grid;gap:8px;margin-top:10px}
+.secondary-btn{width:100%;padding:11px;border:1px solid var(--border);background:#fff;border-radius:10px;cursor:pointer;font-weight:750}
+.auth-status{min-height:22px;margin-top:8px;font-size:13px}
+.account-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.install-btn,.account-btn{border:1px solid var(--border);background:#fff;border-radius:9px;padding:8px 10px;cursor:pointer;font-weight:750;font-size:12px}
+.sync-status{font-size:11px;color:var(--muted)}
+@media(max-width:900px){.account-tools{gap:4px}.install-btn,.account-btn{padding:7px 8px}.sync-status{display:none}}
+
 </style>
 </head>
 
 <body>
+
+<div id="authOverlay" class="auth-overlay hidden">
+  <div class="auth-card">
+    <h2>☁️ Sincronizar progreso</h2>
+    <p>Entra con la misma cuenta de Aula Interactiva. Tu glosario y la página actual se guardarán en Firebase y aparecerán en tus otros dispositivos.</p>
+    <input id="authEmail" type="email" autocomplete="email" placeholder="Correo">
+    <input id="authPassword" type="password" autocomplete="current-password" placeholder="Contraseña">
+    <div class="auth-actions">
+      <button id="authLoginBtn" class="primary-btn">Entrar y sincronizar</button>
+      <button id="authResetBtn" class="secondary-btn">Olvidé mi contraseña</button>
+      <button id="authCloseBtn" class="secondary-btn">Seguir sin sincronizar</button>
+    </div>
+    <div id="authStatus" class="auth-status"></div>
+  </div>
+</div>
 
 <header>
 
@@ -557,8 +626,11 @@ onclick="showView('reviewView',this)"
 
 </div>
 
-<div class="header-count">
-📚 <span id="glossaryCount">0</span> guardadas
+<div class="account-tools">
+  <div class="header-count">📚 <span id="glossaryCount">0</span> guardadas</div>
+  <span id="syncStatus" class="sync-status">Solo en este dispositivo</span>
+  <button id="installAppBtn" class="install-btn" style="display:none">⬇️ Instalar app</button>
+  <button id="accountBtn" class="account-btn">👤 Cuenta</button>
 </div>
 
 </header>
@@ -598,8 +670,8 @@ escucha la pronunciación.
 
 <br>
 
-<strong>Subrayado morado:</strong>
-la expresión está marcada como 成语.
+<strong>Etiquetas de expresión:</strong>
+se indicará si es 成语 (chengyu), expresión común, expresión coloquial o combinación fija.
 
 <br><br>
 
@@ -793,6 +865,11 @@ id="tooltipType"
 class="tooltip-type"
 ></div>
 
+<div
+id="tooltipNote"
+class="tooltip-note"
+></div>
+
 <button
 id="tooltipSave"
 class="tooltip-save"
@@ -802,6 +879,10 @@ class="tooltip-save"
 
 </div>
 
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
 <script>
 
@@ -1117,12 +1198,14 @@ es:"desagradar / resultar molesto"
 "五大三粗":{
 pinyin:"wǔ dà sān cū",
 es:"corpulento, grande y de aspecto rudo",
-type:"成语"
+type:"成语 · Chengyu"
 },
 
 "一脸横肉":{
 pinyin:"yì liǎn héngròu",
-es:"rostro de aspecto feroz / facciones toscas"
+es:"rostro de aspecto feroz / facciones toscas",
+type:"固定搭配 · Combinación fija",
+note:"Expresión descriptiva que conviene aprender como bloque, no carácter por carácter."
 },
 
 "脏兮兮":{
@@ -1147,7 +1230,9 @@ es:"olor a cigarrillo"
 
 "粗声大嗓":{
 pinyin:"cū shēng dà sǎng",
-es:"voz fuerte y áspera"
+es:"hablar con voz fuerte y áspera",
+type:"常用表达 · Expresión común",
+note:"Expresión descriptiva de uso coloquial; funciona mejor como una unidad de significado."
 },
 
 "反感":{
@@ -1158,7 +1243,7 @@ es:"antipatía / rechazo"
 "直呼其名":{
 pinyin:"zhí hū qí míng",
 es:"llamar directamente a alguien por su nombre",
-type:"成语"
+type:"成语 · Chengyu"
 },
 
 "不舒服":{
@@ -1243,7 +1328,9 @@ es:"sonreír / sonrisa"
 
 "使了个眼色":{
 pinyin:"shǐ le ge yǎnsè",
-es:"hacer una señal con la mirada"
+es:"hacer una señal con la mirada",
+type:"常用表达 · Expresión común",
+note:"Patrón muy frecuente: 使个眼色 / 使眼色 = hacer una señal con la mirada."
 },
 
 "楼道":{
@@ -1387,6 +1474,13 @@ es:"privacidad personal"
 "隐私":{
 pinyin:"yǐnsī",
 es:"privacidad"
+},
+
+"还啥都成隐私了":{
+pinyin:"hái shá dōu chéng yǐnsī le",
+es:"¿Ahora resulta que todo es privacidad? / ¿Ya todo va a ser ‘privacidad’ o qué?",
+type:"口语表达 · Expresión coloquial",
+note:"Se aprende mejor como bloque. 啥 es una forma coloquial de 什么. La frase expresa sorpresa, crítica o incredulidad."
 },
 
 "没必要":{
@@ -1616,7 +1710,9 @@ es:"avisar o hablar previamente con alguien"
 
 "实在不行":{
 pinyin:"shízài bùxíng",
-es:"si realmente no hay otra opción"
+es:"si de verdad no hay otra opción / si no queda más remedio",
+type:"口语表达 · Expresión coloquial",
+note:"Muy frecuente en conversación para introducir una alternativa de último recurso."
 },
 
 "延期":{
@@ -1646,7 +1742,9 @@ es:"parecer / aparentemente"
 
 "长出了一口气":{
 pinyin:"cháng chū le yì kǒu qì",
-es:"soltar un largo suspiro de alivio"
+es:"soltar un largo suspiro de alivio",
+type:"固定搭配 · Combinación fija",
+note:"Se usa como bloque para expresar alivio después de una situación tensa."
 },
 
 "小声":{
@@ -1657,7 +1755,7 @@ es:"en voz baja"
 "劣迹斑斑":{
 pinyin:"lièjì bānbān",
 es:"tener un historial lleno de malas acciones",
-type:"成语"
+type:"成语 · Chengyu"
 },
 
 "前几年":{
@@ -1732,7 +1830,9 @@ es:"crimen organizado / mafia"
 
 "打得火热":{
 pinyin:"dǎ de huǒrè",
-es:"mantener una relación muy estrecha / intensa"
+es:"llevarse muy estrechamente / estar muy compenetrados",
+type:"常用表达 · Expresión común",
+note:"Expresión figurada. No significa literalmente ‘golpear con calor’."
 },
 
 "一帮":{
@@ -1802,7 +1902,9 @@ es:"deber / probablemente"
 
 "过人之处":{
 pinyin:"guòrén zhī chù",
-es:"cualidad excepcional / talento superior"
+es:"cualidad excepcional / punto en el que alguien sobresale",
+type:"固定搭配 · Combinación fija",
+note:"Bloque frecuente para hablar de una cualidad que supera a la de los demás."
 },
 
 "不过":{
@@ -1915,7 +2017,9 @@ es:"desorden / caos"
 
 "吃惊不小":{
 pinyin:"chījīng bù xiǎo",
-es:"llevarse una gran sorpresa"
+es:"llevarse una gran sorpresa",
+type:"常用表达 · Expresión común",
+note:"La negación 不小 intensifica la idea: literalmente, ‘la sorpresa no fue pequeña’."
 },
 
 "周围":{
@@ -2166,7 +2270,7 @@ es:"identidad / condición"
 "大吃一惊":{
 pinyin:"dà chī yì jīng",
 es:"llevarse una enorme sorpresa",
-type:"成语"
+type:"成语 · Chengyu"
 },
 
 "分别":{
@@ -2525,7 +2629,7 @@ es:"recién llegado / novato"
 "来龙去脉":{
 pinyin:"lái lóng qù mài",
 es:"antecedentes y desarrollo completo de un asunto",
-type:"成语"
+type:"成语 · Chengyu"
 },
 
 "印证":{
@@ -2764,13 +2868,13 @@ es:"voz áspera y fuerte"
 "戴罪立功":{
 pinyin:"dài zuì lì gōng",
 es:"redimirse realizando un mérito mientras se carga con una culpa",
-type:"成语"
+type:"成语 · Chengyu"
 },
 
 "歪门邪道":{
 pinyin:"wāi mén xié dào",
 es:"métodos turbios / caminos poco ortodoxos o inmorales",
-type:"成语"
+type:"成语 · Chengyu"
 },
 
 "顾不上":{
@@ -2856,7 +2960,7 @@ es:"calle"
 "车流如织":{
 pinyin:"chē liú rú zhī",
 es:"tráfico muy denso, como hilos entretejidos",
-type:"成语"
+type:"成语 · Chengyu"
 },
 
 "草坪":{
@@ -2960,7 +3064,7 @@ es:"la vanguardia / lo más avanzado"
 "心不在焉":{
 pinyin:"xīn bù zài yān",
 es:"estar distraído / tener la mente en otra parte",
-type:"成语"
+type:"成语 · Chengyu"
 },
 
 "目光":{
@@ -3618,12 +3722,15 @@ es:"todavía más"
    ALMACENAMIENTO
 ================================================== */
 
-const STORAGE_KEY="chineseReaderGlossaryV4";
+const STORAGE_KEY="chineseReaderGlossaryV5";
+const AUTO_DICT_KEY="chineseReaderAutoDictionaryV1";
 
-let glossary=
-JSON.parse(
-localStorage.getItem(STORAGE_KEY) || "{}"
-);
+let glossary=JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem("chineseReaderGlossaryV4") || "{}");
+localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
+let autoDictionary=JSON.parse(localStorage.getItem(AUTO_DICT_KEY) || "{}");
+let currentFirebaseUser=null;
+let cloudReady=false;
+let cloudSaveTimer=null;
 
 let page=
 Number(
@@ -3669,71 +3776,56 @@ function tokenize(text){
 
 let result=[];
 let i=0;
+const segmenter=(typeof Intl!=="undefined" && Intl.Segmenter)
+? new Intl.Segmenter("zh-CN",{granularity:"word"})
+: null;
 
 while(i<text.length){
+  if(text[i]==="\n"){ result.push({text:"\n",known:false}); i++; continue; }
+  if(!isHan(text[i])){ result.push({text:text[i],known:false}); i++; continue; }
 
-if(text[i]==="\n"){
+  let match=null;
+  for(const key of dictionaryKeys){
+    if(text.startsWith(key,i)){ match=key; break; }
+  }
 
-result.push({
-text:"\n",
-known:false
-});
+  if(match){
+    result.push({text:match,known:true,auto:false});
+    i+=match.length;
+    continue;
+  }
 
-i++;
-continue;
-
-}
-
-if(!isHan(text[i])){
-
-result.push({
-text:text[i],
-known:false
-});
-
-i++;
-continue;
-
-}
-
-let match=null;
-
-for(const key of dictionaryKeys){
-
-if(text.startsWith(key,i)){
-
-match=key;
-break;
-
-}
-
-}
-
-if(match){
-
-result.push({
-text:match,
-known:true
-});
-
-i+=match.length;
-
-}else{
-
-result.push({
-text:text[i],
-known:false
-});
-
-i++;
-
-}
-
+  let end=i;
+  while(end<text.length && isHan(text[end])) end++;
+  const run=text.slice(i,end);
+  let piece=run[0];
+  if(segmenter){
+    const first=segmenter.segment(run)[Symbol.iterator]().next().value;
+    if(first && first.segment) piece=first.segment;
+  }
+  result.push({text:piece,known:true,auto:true});
+  i+=piece.length;
 }
 
 return result;
 }
 
+function getWordData(word){
+  return dictionary[word] || autoDictionary[word] || null;
+}
+
+async function fetchAutoTranslation(word){
+  if(autoDictionary[word]) return autoDictionary[word];
+  const url="https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=es&dt=t&q="+encodeURIComponent(word);
+  const response=await fetch(url);
+  if(!response.ok) throw new Error("No se pudo traducir");
+  const data=await response.json();
+  const translation=(data && data[0] ? data[0].filter(Boolean).map(x=>x && x[0] ? x[0] : "").join("") : "").trim();
+  if(!translation) throw new Error("Traducción vacía");
+  autoDictionary[word]={pinyin:"",es:translation,auto:true};
+  localStorage.setItem(AUTO_DICT_KEY,JSON.stringify(autoDictionary));
+  return autoDictionary[word];
+}
 
 /* ==================================================
    RENDER DE LECTURA
@@ -3798,9 +3890,11 @@ span.className="word";
 span.textContent=token.text;
 span.dataset.word=token.text;
 
-const info=dictionary[token.text];
+const info=getWordData(token.text);
 
-if(info && info.type==="成语"){
+if(token.auto){ span.classList.add("auto-word"); }
+
+if(info && info.type && info.type.startsWith("成语")){
 span.classList.add("chengyu");
 }
 
@@ -3876,10 +3970,8 @@ return;
 
 page=next;
 
-localStorage.setItem(
-"readerPageV4",
-page
-);
+localStorage.setItem("readerPageV4",page);
+scheduleCloudSave();
 
 closeTooltip();
 
@@ -3897,127 +3989,68 @@ behavior:"smooth"
    TOOLTIP
 ================================================== */
 
-function openTooltip(word,event){
-
-const data=
-dictionary[word];
-
-if(!data){
-return;
-}
+async function openTooltip(word,event){
 
 activeWord=word;
-
-document.getElementById(
-"tooltipWord"
-).textContent=
-word;
-
-document.getElementById(
-"tooltipPinyin"
-).textContent=
-data.pinyin;
-
-document.getElementById(
-"tooltipTranslation"
-).textContent=
-data.es;
-
-const typeBox=
-document.getElementById(
-"tooltipType"
-);
-
-if(data.type){
-
-typeBox.style.display=
-"block";
-
-typeBox.textContent=
-data.type;
-
-}else{
-
-typeBox.style.display=
-"none";
-
-typeBox.textContent="";
-
-}
-
-const tooltip=
-document.getElementById(
-"tooltip"
-);
-
-tooltip.style.display=
-"block";
-
+const tooltip=document.getElementById("tooltip");
+document.getElementById("tooltipWord").textContent=word;
+document.getElementById("tooltipPinyin").textContent="";
+document.getElementById("tooltipTranslation").textContent="Buscando traducción…";
+document.getElementById("tooltipType").style.display="none";
+document.getElementById("tooltipNote").style.display="none";
+document.getElementById("tooltipNote").textContent="";
+tooltip.style.display="block";
 updateSaveButton();
 
-if(
-!window.matchMedia("(hover:none)").matches
-){
-
-let x=
-event.clientX+15;
-
-let y=
-event.clientY+15;
-
-if(x+320>innerWidth){
-x=event.clientX-320;
+if(!window.matchMedia("(hover:none)").matches){
+  let x=event.clientX+15, y=event.clientY+15;
+  if(x+320>innerWidth) x=event.clientX-320;
+  if(y+220>innerHeight) y=event.clientY-220;
+  tooltip.style.left=Math.max(8,x)+"px";
+  tooltip.style.top=Math.max(8,y)+"px";
 }
 
-if(y+220>innerHeight){
-y=event.clientY-220;
+let data=getWordData(word);
+if(!data){
+  try{ data=await fetchAutoTranslation(word); }
+  catch(e){
+    if(activeWord===word){
+      document.getElementById("tooltipTranslation").textContent="Sin conexión: toca esta palabra cuando tengas internet para descargar su traducción.";
+      document.getElementById("tooltipPinyin").textContent="Puedes escucharla con 🔊";
+    }
+    return;
+  }
 }
+if(activeWord!==word) return;
 
-tooltip.style.left=
-Math.max(8,x)+"px";
-
-tooltip.style.top=
-Math.max(8,y)+"px";
-
-}
-
+document.getElementById("tooltipPinyin").textContent=data.pinyin || "Pronunciación disponible con 🔊";
+document.getElementById("tooltipTranslation").textContent=data.es || "";
+const typeBox=document.getElementById("tooltipType");
+if(data.type){ typeBox.style.display="block"; typeBox.textContent=data.type; }
+else{ typeBox.style.display="none"; typeBox.textContent=""; }
+const noteBox=document.getElementById("tooltipNote");
+if(data.note){ noteBox.style.display="block"; noteBox.textContent=data.note; }
+else{ noteBox.style.display="none"; noteBox.textContent=""; }
+updateSaveButton();
 }
 
 function closeTooltip(){
-
-document.getElementById(
-"tooltip"
-).style.display=
-"none";
-
-activeWord=null;
-
+  document.getElementById("tooltip").style.display="none";
+  activeWord=null;
 }
 
-document.getElementById(
-"tooltipAudio"
-).onclick=
-event=>{
-
-event.stopPropagation();
-
-if(activeWord){
-speakChinese(activeWord);
-}
-
+document.getElementById("tooltipAudio").onclick=event=>{
+  event.stopPropagation();
+  if(activeWord) speakChinese(activeWord);
 };
 
-document.getElementById(
-"tooltipSave"
-).onclick=
-event=>{
-
-event.stopPropagation();
-
-if(activeWord){
-saveWord(activeWord);
-}
-
+document.getElementById("tooltipSave").onclick=async event=>{
+  event.stopPropagation();
+  if(!activeWord) return;
+  if(!getWordData(activeWord)){
+    try{ await fetchAutoTranslation(activeWord); }catch(e){ return; }
+  }
+  saveWord(activeWord);
 };
 
 
@@ -4111,55 +4144,27 @@ utterance
 ================================================== */
 
 function saveWord(word){
-
-const data=
-dictionary[word];
-
-if(
-!data ||
-!data.pinyin ||
-!data.es
-){
-return;
-}
-
-glossary[word]={
-
-word:word,
-
-pinyin:data.pinyin,
-
-translation:data.es,
-
-type:data.type || ""
-
-};
-
-localStorage.setItem(
-STORAGE_KEY,
-JSON.stringify(glossary)
-);
-
-renderGlossary();
-renderReading();
-updateCount();
-updateSaveButton();
-
+  const data=getWordData(word);
+  if(!data || !data.es) return;
+  glossary[word]={word,pinyin:data.pinyin || "",translation:data.es,type:data.type || ""};
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
+  scheduleCloudSave();
+  renderGlossary();renderReading();updateCount();updateSaveButton();
 }
 
 function deleteWord(word){
+  delete glossary[word];
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
+  scheduleCloudSave();
+  renderGlossary();renderReading();updateCount();
+}
 
-delete glossary[word];
-
-localStorage.setItem(
-STORAGE_KEY,
-JSON.stringify(glossary)
-);
-
-renderGlossary();
-renderReading();
-updateCount();
-
+function typeBadgeClass(type){
+  const t=String(type||"");
+  if(t.startsWith("口语表达")) return "type-badge colloquial";
+  if(t.startsWith("常用表达")) return "type-badge expression";
+  if(t.startsWith("固定搭配")) return "type-badge collocation";
+  return "type-badge";
 }
 
 function renderGlossary(){
@@ -4213,7 +4218,7 @@ ${item.translation}
 ${
 item.type
 ?
-`<span class="type-badge">${item.type}</span>`
+`<span class="${typeBadgeClass(item.type)}">${item.type}</span>`
 :
 ""
 }
@@ -5568,12 +5573,110 @@ closeTooltip();
 
 
 /* ==================================================
+   FIREBASE + SINCRONIZACIÓN
+================================================== */
+const firebaseConfig={
+  apiKey:"AIzaSyB2rqwvXD91aI2I036yscV-_aJ9oJ0tOSc",
+  authDomain:"clases-d23c1.firebaseapp.com",
+  projectId:"clases-d23c1",
+  storageBucket:"clases-d23c1.firebasestorage.app",
+  messagingSenderId:"600762030142",
+  appId:"1:600762030142:web:1b4a5d2f63a2473a55596f"
+};
+
+let fbAuth=null,fbDb=null;
+function setSyncStatus(text){ const el=document.getElementById("syncStatus"); if(el) el.textContent=text; }
+
+function scheduleCloudSave(){
+  if(!cloudReady || !currentFirebaseUser || !fbDb) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer=setTimeout(saveCloudProgress,500);
+}
+
+async function saveCloudProgress(){
+  if(!cloudReady || !currentFirebaseUser || !fbDb) return;
+  setSyncStatus("Sincronizando…");
+  try{
+    await fbDb.collection("users").doc(currentFirebaseUser.uid).set({
+      readerThreeBody:{glossary,page,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}
+    },{merge:true});
+    setSyncStatus("☁️ Sincronizado");
+  }catch(e){ setSyncStatus("Sin conexión · guardado local"); }
+}
+
+async function loadCloudProgress(user){
+  try{
+    const snap=await fbDb.collection("users").doc(user.uid).get();
+    const cloud=snap.exists && snap.data().readerThreeBody ? snap.data().readerThreeBody : null;
+    if(cloud){
+      glossary={...glossary,...(cloud.glossary||{})};
+      if(Number.isInteger(cloud.page) && cloud.page>=0 && cloud.page<readings.length) page=cloud.page;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
+      localStorage.setItem("readerPageV4",page);
+    }
+    renderReading();renderGlossary();updateCount();
+    await saveCloudProgress();
+  }catch(e){ setSyncStatus("Sin conexión · guardado local"); }
+}
+
+function initFirebase(){
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    fbAuth=firebase.auth();fbDb=firebase.firestore();
+    fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
+    fbAuth.onAuthStateChanged(async user=>{
+      currentFirebaseUser=user||null;
+      cloudReady=!!user;
+      document.getElementById("accountBtn").textContent=user?"👤 "+((user.email||"").split("@")[0]||"Cuenta"):"👤 Cuenta";
+      if(user){ setSyncStatus("Cargando nube…"); await loadCloudProgress(user); }
+      else setSyncStatus("Solo en este dispositivo");
+    });
+  }catch(e){ setSyncStatus("Solo en este dispositivo"); }
+}
+
+const authOverlay=document.getElementById("authOverlay");
+document.getElementById("accountBtn").onclick=()=>{
+  if(currentFirebaseUser){
+    if(confirm("¿Cerrar sesión de esta cuenta?")) fbAuth.signOut();
+  }else authOverlay.classList.remove("hidden");
+};
+document.getElementById("authCloseBtn").onclick=()=>authOverlay.classList.add("hidden");
+document.getElementById("authLoginBtn").onclick=async()=>{
+  const email=document.getElementById("authEmail").value.trim();
+  const password=document.getElementById("authPassword").value;
+  const status=document.getElementById("authStatus");
+  status.textContent="Entrando…";
+  try{ await fbAuth.signInWithEmailAndPassword(email,password); authOverlay.classList.add("hidden"); status.textContent=""; }
+  catch(e){ status.textContent="No se pudo iniciar sesión. Revisa correo y contraseña."; }
+};
+document.getElementById("authResetBtn").onclick=async()=>{
+  const email=document.getElementById("authEmail").value.trim();
+  const status=document.getElementById("authStatus");
+  if(!email){status.textContent="Escribe primero tu correo.";return;}
+  try{await fbAuth.sendPasswordResetEmail(email);status.textContent="Te envié el correo para restablecer la contraseña.";}
+  catch(e){status.textContent="No se pudo enviar el correo.";}
+};
+
+/* ==================================================
+   PWA / INSTALACIÓN
+================================================== */
+let deferredInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault();deferredInstallPrompt=e;document.getElementById("installAppBtn").style.display="inline-block";
+});
+document.getElementById("installAppBtn").onclick=async()=>{
+  if(!deferredInstallPrompt){ alert("En iPhone/iPad usa Compartir → Añadir a pantalla de inicio."); return; }
+  deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;document.getElementById("installAppBtn").style.display="none";
+};
+if("serviceWorker" in navigator){ window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{})); }
+
+/* ==================================================
    INICIO
 ================================================== */
-
 renderReading();
 renderGlossary();
 updateCount();
+initFirebase();
 
 </script>
 
