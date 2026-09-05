@@ -366,6 +366,121 @@ header{
   padding:30px 20px;
 }
 
+/* ===== MODO REPASO A PANTALLA COMPLETA ===== */
+body.review-focus{overflow:hidden;}
+body.review-focus > header{display:none;}
+.review-fullscreen.active{
+  position:fixed;
+  inset:0;
+  z-index:500;
+  display:block;
+  background:var(--bg);
+  overflow:auto;
+}
+.review-stage{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:78px 28px 36px;
+}
+.review-fullscreen .quiz-card{
+  width:min(1080px,100%);
+  min-height:min(680px,calc(100vh - 110px));
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:48px 56px;
+}
+.review-menu-toggle{
+  position:fixed;
+  top:18px;
+  left:18px;
+  z-index:530;
+  width:52px;
+  height:52px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#fff;
+  font-size:28px;
+  cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.08);
+}
+.review-mode-title{
+  position:fixed;
+  top:28px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:510;
+  font-size:18px;
+  font-weight:850;
+  white-space:nowrap;
+}
+.review-menu-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:540;
+  background:rgba(0,0,0,.28);
+  opacity:0;
+  pointer-events:none;
+  transition:.2s;
+}
+.review-menu{
+  position:fixed;
+  top:0;
+  bottom:0;
+  left:0;
+  z-index:550;
+  width:min(340px,86vw);
+  padding:18px;
+  background:#fff;
+  box-shadow:12px 0 40px rgba(0,0,0,.16);
+  transform:translateX(-105%);
+  transition:.22s ease;
+  overflow:auto;
+}
+.review-menu.open{transform:translateX(0);}
+.review-menu-backdrop.open{opacity:1;pointer-events:auto;}
+.review-menu-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-size:24px;
+  padding:8px 4px 18px;
+}
+.review-menu-close{
+  border:0;
+  background:#f2f4f7;
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  font-size:28px;
+  cursor:pointer;
+}
+.review-menu .review-menu-item{
+  width:100%;
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin:7px 0;
+  padding:12px 15px;
+  border:2px solid transparent;
+  border-radius:13px;
+  background:#f7f8fb;
+  font-size:17px;
+  font-weight:800;
+  text-align:left;
+  cursor:pointer;
+}
+.review-menu .review-menu-item.active{
+  border-color:var(--primary);
+  background:var(--primarySoft);
+  color:var(--primary);
+}
+.review-menu-divider{height:1px;background:var(--border);margin:16px 0;}
+.review-menu .review-exit{background:#fff;}
+
 .review-hero,
 .quiz-card{
   background:#fff;
@@ -401,19 +516,24 @@ header{
 .question-label{
   text-align:center;
   color:var(--muted);
+  font-size:22px;
+  font-weight:750;
 }
 
 .question-main{
   text-align:center;
-  font-size:42px;
+  font-size:64px;
   font-weight:900;
-  margin:15px;
+  line-height:1.25;
+  margin:24px 15px;
 }
 
 .question-secondary{
   text-align:center;
   color:var(--muted);
-  margin-bottom:22px;
+  font-size:24px;
+  line-height:1.55;
+  margin-bottom:28px;
 }
 
 .options{
@@ -425,9 +545,13 @@ header{
 }
 
 .option{
-  padding:15px;
+  min-height:78px;
+  padding:18px 22px;
   border:2px solid var(--border);
   background:#fff;
+  font-size:22px;
+  line-height:1.35;
+  font-weight:700;
   border-radius:12px;
   cursor:pointer;
 }
@@ -452,7 +576,7 @@ header{
   padding:15px;
   border:2px solid var(--border);
   border-radius:13px;
-  font-size:18px;
+  font-size:24px;
   text-align:center;
 }
 
@@ -466,6 +590,7 @@ header{
   border-radius:11px;
   cursor:pointer;
   font-weight:800;
+  font-size:20px;
 }
 
 .feedback{
@@ -507,6 +632,20 @@ header{
 }
 
 @media(max-width:900px){
+  .review-stage{padding:72px 12px 18px;align-items:stretch;}
+  .review-fullscreen .quiz-card{
+    min-height:calc(100vh - 90px);
+    border-radius:18px;
+    padding:30px 18px;
+  }
+  .review-menu-toggle{top:12px;left:12px;width:48px;height:48px;font-size:25px;}
+  .review-mode-title{top:23px;font-size:16px;max-width:62vw;overflow:hidden;text-overflow:ellipsis;}
+  .question-label{font-size:19px;}
+  .question-main{font-size:48px;margin:22px 8px;}
+  .question-secondary{font-size:21px;}
+  .option{font-size:20px;min-height:70px;}
+  .answer-input{font-size:22px;}
+
   header{
     padding:8px 10px;
   }
@@ -750,77 +889,32 @@ Las palabras que guardes se utilizarán automáticamente en los ejercicios.
 </section>
 
 
-<section id="reviewView" class="view">
+<section id="reviewView" class="view review-fullscreen">
 
-<main class="review-page">
+<button class="review-menu-toggle" onclick="toggleReviewMenu()" aria-label="Abrir menú">☰</button>
+<div id="reviewModeTitle" class="review-mode-title">🎯 Opción múltiple</div>
 
-<div class="review-hero">
-<h1>🧠 Repasar glosario</h1>
-<p>
-Practica solamente las palabras que hayas guardado durante la lectura.
-</p>
-</div>
+<div id="reviewMenuBackdrop" class="review-menu-backdrop" onclick="closeReviewMenu()"></div>
 
-<div class="mode-grid">
+<nav id="reviewMenu" class="review-menu" aria-label="Menú de repaso">
+  <div class="review-menu-header">
+    <strong>🧠 Repasar</strong>
+    <button class="review-menu-close" onclick="closeReviewMenu()" aria-label="Cerrar menú">×</button>
+  </div>
 
-<button
-class="mode-btn active"
-onclick="setMode('multiple',this)"
->
-<div class="mode-icon">🎯</div>
-<div class="mode-title">Opción múltiple</div>
-<div class="mode-sub">Chino ↔ Español</div>
-</button>
+  <button class="mode-btn review-menu-item active" onclick="setMode('multiple',this)">🎯 <span>Opción múltiple</span></button>
+  <button class="mode-btn review-menu-item" onclick="setMode('typing',this)">⌨️ <span>Escribir</span></button>
+  <button class="mode-btn review-menu-item" onclick="setMode('listening',this)">🎧 <span>Escuchar</span></button>
+  <button class="mode-btn review-menu-item" onclick="setMode('pronunciation',this)">🎙️ <span>Pronunciar</span></button>
+  <button class="mode-btn review-menu-item" onclick="setMode('character',this)">✍️ <span>Caracteres</span></button>
+  <button class="mode-btn review-menu-item" onclick="setMode('wordWriting',this)">🀄 <span>Palabras</span></button>
 
-<button
-class="mode-btn"
-onclick="setMode('typing',this)"
->
-<div class="mode-icon">⌨️</div>
-<div class="mode-title">Escribir</div>
-<div class="mode-sub">Chino ↔ Español</div>
-</button>
+  <div class="review-menu-divider"></div>
+  <button class="review-menu-item review-exit" onclick="exitReviewToReading()">📖 <span>Volver a Lectura</span></button>
+</nav>
 
-<button
-class="mode-btn"
-onclick="setMode('listening',this)"
->
-<div class="mode-icon">🎧</div>
-<div class="mode-title">Escuchar</div>
-<div class="mode-sub">Audio → Español</div>
-</button>
-
-<button
-class="mode-btn"
-onclick="setMode('pronunciation',this)"
->
-<div class="mode-icon">🎙️</div>
-<div class="mode-title">Pronunciar</div>
-<div class="mode-sub">Escucha y repite</div>
-</button>
-
-<button
-class="mode-btn"
-onclick="setMode('character',this)"
->
-<div class="mode-icon">✍️</div>
-<div class="mode-title">Caracteres</div>
-<div class="mode-sub">Uno por uno</div>
-</button>
-
-<button
-class="mode-btn"
-onclick="setMode('wordWriting',this)"
->
-<div class="mode-icon">🀄</div>
-<div class="mode-title">Palabras</div>
-<div class="mode-sub">Palabra completa</div>
-</button>
-
-</div>
-
-<div id="quizCard" class="quiz-card"></div>
-
+<main class="review-stage">
+  <div id="quizCard" class="quiz-card"></div>
 </main>
 </section>
 
@@ -4351,14 +4445,50 @@ btn=>
 btn.classList.remove("active")
 );
 
-button.classList.add(
-"active"
-);
-
-if(id==="reviewView"){
-newQuestion();
+if(button){
+button.classList.add("active");
 }
 
+if(id==="reviewView"){
+document.body.classList.add("review-focus");
+updateReviewModeTitle();
+newQuestion();
+}else{
+document.body.classList.remove("review-focus");
+closeReviewMenu();
+}
+
+}
+
+function toggleReviewMenu(){
+  document.getElementById("reviewMenu").classList.toggle("open");
+  document.getElementById("reviewMenuBackdrop").classList.toggle("open");
+}
+
+function closeReviewMenu(){
+  const menu=document.getElementById("reviewMenu");
+  const backdrop=document.getElementById("reviewMenuBackdrop");
+  if(menu) menu.classList.remove("open");
+  if(backdrop) backdrop.classList.remove("open");
+}
+
+function exitReviewToReading(){
+  closeReviewMenu();
+  const readingBtn=[...document.querySelectorAll(".nav-btn")].find(btn=>btn.textContent.includes("Lectura"));
+  showView("readerView",readingBtn || null);
+}
+
+function updateReviewModeTitle(){
+  const labels={
+    multiple:"🎯 Opción múltiple",
+    typing:"⌨️ Escribir",
+    listening:"🎧 Escuchar",
+    pronunciation:"🎙️ Pronunciar",
+    character:"✍️ Caracteres",
+    wordWriting:"🀄 Palabras"
+  };
+  const title=document.getElementById("reviewModeTitle");
+  if(title) title.textContent=labels[mode] || "🧠 Repasar";
 }
 
 
@@ -4374,16 +4504,18 @@ button
 mode=newMode;
 
 document
-.querySelectorAll(".mode-btn")
+.querySelectorAll("#reviewMenu .mode-btn")
 .forEach(
 btn=>
 btn.classList.remove("active")
 );
 
-button.classList.add(
-"active"
-);
+if(button){
+button.classList.add("active");
+}
 
+updateReviewModeTitle();
+closeReviewMenu();
 newQuestion();
 
 }
