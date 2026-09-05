@@ -4053,6 +4053,25 @@ document.getElementById("tooltipSave").onclick=async event=>{
   saveWord(activeWord);
 };
 
+/* ==================================================
+   CERRAR TOOLTIP AL SALIR DE UNA PALABRA (ESCRITORIO)
+   Se mantiene abierto si el cursor entra al propio tooltip.
+================================================== */
+document.addEventListener("mousemove", event=>{
+  if(window.matchMedia("(hover:none)").matches) return;
+
+  const tooltip=document.getElementById("tooltip");
+  if(!tooltip || tooltip.style.display!=="block") return;
+
+  const target=event.target;
+  const overWord=target.closest && target.closest(".word");
+  const overTooltip=tooltip.contains(target);
+
+  if(!overWord && !overTooltip){
+    closeTooltip();
+  }
+});
+
 
 /* ==================================================
    AUDIO
