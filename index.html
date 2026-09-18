@@ -504,6 +504,49 @@ body.review-focus > header{display:none;}
   font:inherit;
   font-weight:750;
 }
+.practice-status{
+  max-width:680px;
+  width:100%;
+  margin:0 auto 20px;
+  padding:13px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:1px solid #dfe5f5;
+  border-radius:13px;
+  background:#f5f7ff;
+  font-size:15px;
+  font-weight:800;
+}
+.mastery-dots{display:inline-flex;gap:5px;vertical-align:middle;margin-left:7px;}
+.mastery-dot{
+  width:13px;
+  height:13px;
+  display:inline-block;
+  border:2px solid #aeb6c4;
+  border-radius:50%;
+  background:#fff;
+}
+.mastery-dot.filled{border-color:#25a55f;background:#25a55f;box-shadow:0 0 0 2px #dff6e8;}
+.current-word-progress{text-align:center;font-size:17px;font-weight:850;margin:-10px 0 18px;}
+.completion-card{text-align:center;padding:35px 10px;}
+.completion-icon{font-size:72px;margin-bottom:8px;}
+.secondary-btn-wide{
+  width:100%;margin-top:10px;padding:13px;border:1px solid var(--border);
+  background:#fff;border-radius:11px;cursor:pointer;font-weight:800;font-size:16px;
+}
+.word-list-wrap{width:100%;max-width:920px;margin:auto;}
+.word-list-summary{text-align:center;color:var(--muted);margin-bottom:18px;}
+.word-list-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.word-list-card{border:1px solid var(--border);border-radius:14px;padding:16px;background:#fff;}
+.word-list-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:9px;}
+.word-list-word{font-size:27px;font-weight:900;}
+.word-list-translation{color:#404756;line-height:1.45;}
+.word-list-page{color:var(--muted);font-size:12px;font-weight:750;margin-top:5px;}
+.word-list-progress{margin-top:12px;padding-top:10px;border-top:1px solid #eef0f3;display:grid;gap:7px;}
+.word-progress-row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;font-weight:750;}
+.word-complete-badge{color:#17864a;background:#e5f8ec;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:850;}
 
 .review-hero,
 .quiz-card{
@@ -669,6 +712,9 @@ body.review-focus > header{display:none;}
   .question-secondary{font-size:21px;}
   .option{font-size:20px;min-height:70px;}
   .answer-input{font-size:22px;}
+  .practice-status{font-size:13px;align-items:flex-start;flex-direction:column;}
+  .word-list-grid{grid-template-columns:1fr;}
+  .word-list-word{font-size:24px;}
 
   header{
     padding:8px 10px;
@@ -937,6 +983,7 @@ Las palabras que guardes se utilizarán automáticamente en los ejercicios.
   <button class="mode-btn review-menu-item" onclick="setMode('pronunciation',this)">🎙️ <span>Pronunciar</span></button>
   <button class="mode-btn review-menu-item" onclick="setMode('character',this)">✍️ <span>Caracteres</span></button>
   <button class="mode-btn review-menu-item" onclick="setMode('wordWriting',this)">🀄 <span>Palabras</span></button>
+  <button class="mode-btn review-menu-item" onclick="setMode('wordList',this)">📋 <span>Lista de palabras</span></button>
 
   <div class="review-menu-divider"></div>
   <button class="review-menu-item review-exit" onclick="exitReviewToReading()">📖 <span>Volver a Lectura</span></button>
@@ -3847,10 +3894,12 @@ es:"todavía más"
 
 const STORAGE_KEY="chineseReaderGlossaryV5";
 const AUTO_DICT_KEY="chineseReaderAutoDictionaryV1";
+const MASTERY_KEY="chineseReaderMasteryV1";
 
 let glossary=JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem("chineseReaderGlossaryV4") || "{}");
 localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
 let autoDictionary=JSON.parse(localStorage.getItem(AUTO_DICT_KEY) || "{}");
+let mastery=JSON.parse(localStorage.getItem(MASTERY_KEY) || "{}");
 let currentFirebaseUser=null;
 let cloudReady=false;
 let cloudSaveTimer=null;
@@ -3868,6 +3917,9 @@ let activeWord=null;
 let mode="multiple";
 let currentWord=null;
 let reviewPage="all";
+let practiceQueue=[];
+let practiceQueueKey="";
+let lastAskedWord="";
 
 
 /* ==================================================
@@ -4305,7 +4357,11 @@ function saveWord(word){
 
 function deleteWord(word){
   delete glossary[word];
+  Object.keys(mastery).forEach(practiceMode=>{
+    if(mastery[practiceMode]) delete mastery[practiceMode][word];
+  });
   localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
+  localStorage.setItem(MASTERY_KEY,JSON.stringify(mastery));
   scheduleCloudSave();
   renderGlossary();renderReading();updateCount();populateReviewPageSelect();
 }
@@ -4524,10 +4580,11 @@ function updateReviewModeTitle(){
     listening:"🎧 Escuchar",
     pronunciation:"🎙️ Pronunciar",
     character:"✍️ Caracteres",
-    wordWriting:"🀄 Palabras"
+    wordWriting:"🀄 Palabras",
+    wordList:"📋 Lista de palabras"
   };
   const title=document.getElementById("reviewModeTitle");
-  const pageLabel=reviewPage==="all" ? "Todas" : `Página ${reviewPage}`;
+  const pageLabel=mode==="wordList" || reviewPage==="all" ? "Todas" : `Página ${reviewPage}`;
   if(title) title.textContent=`${labels[mode] || "🧠 Repasar"} · ${pageLabel}`;
 }
 
@@ -4542,6 +4599,9 @@ button
 ){
 
 mode=newMode;
+practiceQueue=[];
+practiceQueueKey="";
+lastAskedWord="";
 
 document
 .querySelectorAll("#reviewMenu .mode-btn")
@@ -4596,6 +4656,9 @@ function populateReviewPageSelect(){
 function setReviewPage(value){
   reviewPage=value;
   currentWord=null;
+  practiceQueue=[];
+  practiceQueueKey="";
+  lastAskedWord="";
   updateReviewModeTitle();
   closeReviewMenu();
   newQuestion();
@@ -4609,6 +4672,143 @@ function glossaryArray(){
     const pages=Array.isArray(item.pages) && item.pages.length ? item.pages : inferredPagesForWord(item.word);
     return pages.includes(selectedPage);
   });
+}
+
+function currentSessionWords(practiceMode=mode){
+  const words=glossaryArray();
+  if(practiceMode==="character") return words.filter(item=>[...item.word].some(isHan));
+  return words;
+}
+
+const PRACTICE_MODES=["multiple","typing","listening","pronunciation","character","wordWriting"];
+const PRACTICE_LABELS={
+  multiple:"Opción múltiple",
+  typing:"Escritura",
+  listening:"Solo audio",
+  pronunciation:"Pronunciación",
+  character:"Caracteres",
+  wordWriting:"Palabras"
+};
+
+function masteryScore(word,practiceMode=mode){
+  return Math.max(0,Math.min(2,Number(mastery?.[practiceMode]?.[word]) || 0));
+}
+
+function masteryDots(word,practiceMode=mode){
+  const score=masteryScore(word,practiceMode);
+  return `<span class="mastery-dots" aria-label="${score} de 2 aciertos">`+
+    `<span class="mastery-dot ${score>=1 ? "filled" : ""}"></span>`+
+    `<span class="mastery-dot ${score>=2 ? "filled" : ""}"></span>`+
+    `</span>`;
+}
+
+function saveMastery(){
+  localStorage.setItem(MASTERY_KEY,JSON.stringify(mastery));
+  scheduleCloudSave();
+}
+
+function sessionStats(words=null,practiceMode=mode){
+  if(!words) words=currentSessionWords(practiceMode);
+  const dominated=words.filter(item=>masteryScore(item.word,practiceMode)>=2).length;
+  return {dominated,total:words.length,finished:words.length>0 && dominated===words.length};
+}
+
+function practiceStatusHTML(words=null,practiceMode=mode){
+  if(!words) words=currentSessionWords(practiceMode);
+  const stats=sessionStats(words,practiceMode);
+  return `<div class="practice-status"><span>Progreso: ${stats.dominated} de ${stats.total} palabras dominadas</span>`+
+    `<span>${PRACTICE_LABELS[practiceMode] || "Práctica"}</span></div>`;
+}
+
+function currentWordProgressHTML(word=currentWord,practiceMode=mode){
+  if(!word) return "";
+  return `<div class="current-word-progress">${word.word} ${masteryDots(word.word,practiceMode)}</div>`;
+}
+
+function recordAnswer(ok){
+  if(!currentWord || !PRACTICE_MODES.includes(mode)) return;
+  mastery[mode]=mastery[mode] || {};
+  mastery[mode][currentWord.word]=ok ? Math.min(2,masteryScore(currentWord.word,mode)+1) : 0;
+  if(masteryScore(currentWord.word,mode)<2 && !practiceQueue.includes(currentWord.word)){
+    practiceQueue.push(currentWord.word);
+  }
+  saveMastery();
+  renderGlossary();
+}
+
+function resetModeProgress(){
+  if(!PRACTICE_MODES.includes(mode)) return;
+  if(!confirm(`¿Reiniciar el progreso de ${PRACTICE_LABELS[mode]}?`)) return;
+  mastery[mode]={};
+  saveMastery();
+  practiceQueue=[];
+  practiceQueueKey="";
+  lastAskedWord="";
+  newQuestion();
+}
+
+function nextPracticeWord(words){
+  const key=`${mode}|${reviewPage}|${words.map(item=>item.word).sort().join("|")}`;
+  if(practiceQueueKey!==key){
+    practiceQueueKey=key;
+    practiceQueue=[];
+    lastAskedWord="";
+  }
+  const incomplete=words.filter(item=>masteryScore(item.word,mode)<2);
+  if(incomplete.length===1 && words.length>1 && lastAskedWord===incomplete[0].word){
+    const spacers=words.filter(item=>item.word!==lastAskedWord);
+    const spacer=random(spacers);
+    lastAskedWord=spacer.word;
+    return spacer;
+  }
+  const validWords=new Set(incomplete.map(item=>item.word));
+  practiceQueue=practiceQueue.filter(word=>validWords.has(word));
+  if(!practiceQueue.length) practiceQueue=shuffle(incomplete.map(item=>item.word));
+  if(practiceQueue.length>1 && practiceQueue[0]===lastAskedWord){
+    const alternate=practiceQueue.findIndex(word=>word!==lastAskedWord);
+    if(alternate>0) [practiceQueue[0],practiceQueue[alternate]]=[practiceQueue[alternate],practiceQueue[0]];
+  }
+  const selectedWord=practiceQueue.shift();
+  lastAskedWord=selectedWord || "";
+  return incomplete.find(item=>item.word===selectedWord) || null;
+}
+
+function showFinished(words){
+  document.getElementById("quizCard").innerHTML=`
+    <div class="completion-card">
+      <div class="completion-icon">🏆</div>
+      <h2>Actividad terminada</h2>
+      <p>Dominaste las ${words.length} palabras con dos aciertos en ${PRACTICE_LABELS[mode]}.</p>
+      ${practiceStatusHTML(words,mode)}
+      <button class="secondary-btn-wide" onclick="setMode('wordList',document.querySelector('[onclick*=wordList]'))">📋 Ver lista de palabras</button>
+      <button class="secondary-btn-wide" onclick="resetModeProgress()">↻ Practicar de nuevo</button>
+    </div>`;
+}
+
+function renderWordList(){
+  const words=Object.values(glossary).slice().sort((a,b)=>a.word.localeCompare(b.word,"zh"));
+  const card=document.getElementById("quizCard");
+  if(!words.length){
+    card.innerHTML=`<div class="completion-card"><h2>No hay palabras en esta selección</h2><p>Guarda vocabulario desde la lectura.</p></div>`;
+    return;
+  }
+  card.innerHTML=`<div class="word-list-wrap">
+    <h2 style="text-align:center">📋 Lista de palabras</h2>
+    <div class="word-list-summary">${words.length} palabras · el progreso se guarda por modalidad</div>
+    <div class="word-list-grid">${words.map(item=>{
+      const pages=(Array.isArray(item.pages)&&item.pages.length ? item.pages : inferredPagesForWord(item.word));
+      const completedModes=PRACTICE_MODES.filter(practiceMode=>masteryScore(item.word,practiceMode)>=2).length;
+      return `<article class="word-list-card">
+        <div class="word-list-head"><div><div class="word-list-word">${item.word}</div><div>${item.pinyin || ""}</div></div>
+        ${completedModes===PRACTICE_MODES.length ? '<span class="word-complete-badge">DOMINADA</span>' : ""}</div>
+        <div class="word-list-translation">${item.translation}</div>
+        <div class="word-list-page">${pages.length ? `Página${pages.length>1?"s":""} ${pages.join(", ")}` : "Página sin identificar"}</div>
+        <div class="word-list-progress">${PRACTICE_MODES.map(practiceMode=>
+          `<div class="word-progress-row"><span>${PRACTICE_LABELS[practiceMode]}</span>${masteryDots(item.word,practiceMode)}</div>`
+        ).join("")}</div>
+      </article>`;
+    }).join("")}</div>
+  </div>`;
 }
 
 function random(array){
@@ -4660,7 +4860,7 @@ return result;
 function newQuestion(){
 
 const words=
-glossaryArray();
+currentSessionWords();
 
 const card=
 document.getElementById(
@@ -4689,8 +4889,22 @@ return;
 
 }
 
-currentWord=
-random(words);
+if(mode==="wordList"){
+renderWordList();
+return;
+}
+
+const stats=sessionStats(words,mode);
+if(stats.finished){
+showFinished(words);
+return;
+}
+
+currentWord=nextPracticeWord(words);
+if(!currentWord){
+showFinished(words);
+return;
+}
 
 if(mode==="multiple"){
 multipleQuestion();
@@ -4797,6 +5011,9 @@ document.getElementById(
 );
 
 card.innerHTML=`
+
+${practiceStatusHTML(words)}
+${currentWordProgressHTML()}
 
 <div class="question-label">
 ${
@@ -4914,6 +5131,9 @@ document.getElementById(
 "quizCard"
 ).innerHTML=`
 
+${practiceStatusHTML()}
+${currentWordProgressHTML()}
+
 <div class="question-label">
 
 ${
@@ -5000,6 +5220,10 @@ return;
 const answer=
 input.value.trim();
 
+input.disabled=true;
+const checkButton=input.parentElement.querySelector("button");
+if(checkButton) checkButton.disabled=true;
+
 const correct=
 zhToEs
 ?
@@ -5059,6 +5283,9 @@ function listeningQuestion(){
 document.getElementById(
 "quizCard"
 ).innerHTML=`
+
+${practiceStatusHTML()}
+${currentWordProgressHTML()}
 
 <div class="question-label">
 🎧 Escucha el chino y escribe el significado
@@ -5135,6 +5362,10 @@ if(!input){
 return;
 }
 
+input.disabled=true;
+const checkButton=input.parentElement.querySelector("button");
+if(checkButton) checkButton.disabled=true;
+
 const answer=
 normalize(
 input.value
@@ -5161,6 +5392,8 @@ possibility.includes(answer)
 )
 );
 
+recordAnswer(ok);
+
 document.getElementById(
 "feedback"
 ).innerHTML=`
@@ -5184,6 +5417,11 @@ ok
 "✕ Incorrecto"
 }
 </strong>
+
+<br><br>
+${currentWord.word} ${masteryDots(currentWord.word,mode)}
+<br>
+Progreso: ${sessionStats().dominated} de ${sessionStats().total} palabras dominadas
 
 <br><br>
 
@@ -5247,6 +5485,9 @@ document.getElementById(
 "quizCard"
 ).innerHTML=`
 
+${practiceStatusHTML()}
+${currentWordProgressHTML()}
+
 <div class="question-label">
 Escucha y repite
 </div>
@@ -5289,9 +5530,16 @@ onclick="speakChinese('${escapeJS(currentWord.word)}')"
 
 <button
 class="primary-btn"
-onclick="newQuestion()"
+onclick="selfAssessPractice(true)"
 >
-Ya la repetí → Siguiente
+✓ La pronuncié correctamente
+</button>
+
+<button
+class="secondary-btn-wide"
+onclick="selfAssessPractice(false)"
+>
+Necesito repetirla
 </button>
 
 </div>
@@ -5314,45 +5562,22 @@ currentWord.word
 
 function characterQuestion(){
 
-const chars=[];
-
-glossaryArray()
-.forEach(word=>{
-
-[
-...word.word
-]
-.forEach(char=>{
-
-if(isHan(char)){
-
-chars.push({
-
-char:char,
-
-word:word
-
-});
-
-}
-
-});
-
-});
+const chars=[...currentWord.word].filter(isHan);
 
 if(!chars.length){
-return;
+  recordAnswer(false);
+  newQuestion();
+  return;
 }
 
-const selected=
-random(chars);
-
-currentWord=
-selected.word;
+const selectedChar=random(chars);
 
 document.getElementById(
 "quizCard"
 ).innerHTML=`
+
+${practiceStatusHTML()}
+${currentWordProgressHTML()}
 
 <div class="question-label">
 Copia este carácter
@@ -5362,7 +5587,7 @@ Copia este carácter
 class="question-main"
 style="font-size:90px"
 >
-${selected.char}
+${selectedChar}
 </div>
 
 <div class="question-secondary">
@@ -5370,16 +5595,16 @@ ${selected.char}
 De la palabra:
 
 <strong>
-${selected.word.word}
+${currentWord.word}
 </strong>
 
 <br>
 
-${selected.word.pinyin}
+${currentWord.pinyin}
 
 <br>
 
-${selected.word.translation}
+${currentWord.translation}
 
 </div>
 
@@ -5398,9 +5623,16 @@ onclick="clearCanvas()"
 
 <button
 class="primary-btn"
-onclick="newQuestion()"
+onclick="selfAssessPractice(true)"
 >
-Otro carácter →
+✓ Lo escribí correctamente
+</button>
+
+<button
+class="secondary-btn-wide"
+onclick="selfAssessPractice(false)"
+>
+Me equivoqué
 </button>
 
 </div>
@@ -5421,6 +5653,9 @@ function wordWritingQuestion(){
 document.getElementById(
 "quizCard"
 ).innerHTML=`
+
+${practiceStatusHTML()}
+${currentWordProgressHTML()}
 
 <div class="question-label">
 Escribe esta palabra
@@ -5509,17 +5744,18 @@ ${currentWord.type}
 ""
 }
 
-<button
-class="primary-btn"
-onclick="newQuestion()"
->
-Otra palabra →
-</button>
+<button class="primary-btn" onclick="selfAssessPractice(true)">✓ La escribí correctamente</button>
+<button class="secondary-btn-wide" onclick="selfAssessPractice(false)">Me equivoqué</button>
 
 </div>
 
 `;
 
+}
+
+function selfAssessPractice(ok){
+  recordAnswer(ok);
+  newQuestion();
 }
 
 
@@ -5672,6 +5908,8 @@ if(!feedback){
 return;
 }
 
+recordAnswer(ok);
+
 feedback.innerHTML=`
 
 <div
@@ -5693,6 +5931,11 @@ ok
 "✕ Incorrecto"
 }
 </strong>
+
+<br><br>
+${currentWord.word} ${masteryDots(currentWord.word,mode)}
+<br>
+Progreso: ${sessionStats().dominated} de ${sessionStats().total} palabras dominadas
 
 ${
 ok
@@ -5830,7 +6073,7 @@ async function saveCloudProgress(){
   setSyncStatus("Sincronizando…");
   try{
     await fbDb.collection("users").doc(currentFirebaseUser.uid).set({
-      readerThreeBody:{glossary,page,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}
+      readerThreeBody:{glossary,page,mastery,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}
     },{merge:true});
     setSyncStatus("☁️ Sincronizado");
   }catch(e){ setSyncStatus("Sin conexión · guardado local"); }
@@ -5842,8 +6085,10 @@ async function loadCloudProgress(user){
     const cloud=snap.exists && snap.data().readerThreeBody ? snap.data().readerThreeBody : null;
     if(cloud){
       glossary={...glossary,...(cloud.glossary||{})};
+      mastery={...mastery,...(cloud.mastery||{})};
       if(Number.isInteger(cloud.page) && cloud.page>=0 && cloud.page<readings.length) page=cloud.page;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
+      localStorage.setItem(MASTERY_KEY,JSON.stringify(mastery));
       localStorage.setItem("readerPageV4",page);
     }
     normalizeGlossaryPages();
