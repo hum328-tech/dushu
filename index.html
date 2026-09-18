@@ -480,6 +480,30 @@ body.review-focus > header{display:none;}
 }
 .review-menu-divider{height:1px;background:var(--border);margin:16px 0;}
 .review-menu .review-exit{background:#fff;}
+.review-page-filter{
+  margin:14px 0 6px;
+  padding:13px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#f8f9fc;
+}
+.review-page-filter label{
+  display:block;
+  margin-bottom:7px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+}
+.review-page-filter select{
+  width:100%;
+  padding:10px 11px;
+  border:1px solid var(--border);
+  border-radius:9px;
+  background:#fff;
+  color:var(--text);
+  font:inherit;
+  font-weight:750;
+}
 
 .review-hero,
 .quiz-card{
@@ -900,6 +924,11 @@ Las palabras que guardes se utilizarán automáticamente en los ejercicios.
   <div class="review-menu-header">
     <strong>🧠 Repasar</strong>
     <button class="review-menu-close" onclick="closeReviewMenu()" aria-label="Cerrar menú">×</button>
+  </div>
+
+  <div class="review-page-filter">
+    <label for="reviewPageSelect">VOCABULARIO PARA REPASAR</label>
+    <select id="reviewPageSelect" onchange="setReviewPage(this.value)"></select>
   </div>
 
   <button class="mode-btn review-menu-item active" onclick="setMode('multiple',this)">🎯 <span>Opción múltiple</span></button>
@@ -3838,6 +3867,7 @@ page=0;
 let activeWord=null;
 let mode="multiple";
 let currentWord=null;
+let reviewPage="all";
 
 
 /* ==================================================
@@ -4259,17 +4289,25 @@ utterance
 function saveWord(word){
   const data=getWordData(word);
   if(!data || !data.es) return;
-  glossary[word]={word,pinyin:data.pinyin || "",translation:data.es,type:data.type || ""};
+  const pageNumber=readings[page].page;
+  const existingPages=Array.isArray(glossary[word]?.pages) ? glossary[word].pages : [];
+  glossary[word]={
+    word,
+    pinyin:data.pinyin || "",
+    translation:data.es,
+    type:data.type || "",
+    pages:[...new Set([...existingPages,pageNumber])].sort((a,b)=>a-b)
+  };
   localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
   scheduleCloudSave();
-  renderGlossary();renderReading();updateCount();updateSaveButton();
+  renderGlossary();renderReading();updateCount();populateReviewPageSelect();updateSaveButton();
 }
 
 function deleteWord(word){
   delete glossary[word];
   localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
   scheduleCloudSave();
-  renderGlossary();renderReading();updateCount();
+  renderGlossary();renderReading();updateCount();populateReviewPageSelect();
 }
 
 function typeBadgeClass(type){
@@ -4451,6 +4489,7 @@ button.classList.add("active");
 
 if(id==="reviewView"){
 document.body.classList.add("review-focus");
+populateReviewPageSelect();
 updateReviewModeTitle();
 newQuestion();
 }else{
@@ -4488,7 +4527,8 @@ function updateReviewModeTitle(){
     wordWriting:"🀄 Palabras"
   };
   const title=document.getElementById("reviewModeTitle");
-  if(title) title.textContent=labels[mode] || "🧠 Repasar";
+  const pageLabel=reviewPage==="all" ? "Todas" : `Página ${reviewPage}`;
+  if(title) title.textContent=`${labels[mode] || "🧠 Repasar"} · ${pageLabel}`;
 }
 
 
@@ -4520,12 +4560,55 @@ newQuestion();
 
 }
 
+function inferredPagesForWord(word){
+  return readings
+    .filter(reading=>reading.text.includes(word))
+    .map(reading=>reading.page);
+}
+
+function normalizeGlossaryPages(){
+  let changed=false;
+  Object.values(glossary).forEach(item=>{
+    if(!Array.isArray(item.pages) || !item.pages.length){
+      item.pages=inferredPagesForWord(item.word);
+      changed=true;
+    }
+  });
+  if(changed) localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
+}
+
+function populateReviewPageSelect(){
+  const select=document.getElementById("reviewPageSelect");
+  if(!select) return;
+  const availablePages=[...new Set(
+    Object.values(glossary).flatMap(item=>
+      Array.isArray(item.pages) && item.pages.length ? item.pages : inferredPagesForWord(item.word)
+    )
+  )].sort((a,b)=>a-b);
+
+  select.innerHTML=`<option value="all">Todas las páginas</option>`+
+    availablePages.map(pageNumber=>`<option value="${pageNumber}">Página ${pageNumber}</option>`).join("");
+
+  if(reviewPage!=="all" && !availablePages.includes(Number(reviewPage))) reviewPage="all";
+  select.value=reviewPage;
+}
+
+function setReviewPage(value){
+  reviewPage=value;
+  currentWord=null;
+  updateReviewModeTitle();
+  closeReviewMenu();
+  newQuestion();
+}
+
 function glossaryArray(){
-
-return Object.values(
-glossary
-);
-
+  const words=Object.values(glossary);
+  if(reviewPage==="all") return words;
+  const selectedPage=Number(reviewPage);
+  return words.filter(item=>{
+    const pages=Array.isArray(item.pages) && item.pages.length ? item.pages : inferredPagesForWord(item.word);
+    return pages.includes(selectedPage);
+  });
 }
 
 function random(array){
@@ -4593,12 +4676,10 @@ text-align:center;
 padding:50px
 ">
 
-<h2>
-Tu glosario está vacío
-</h2>
+<h2>${reviewPage==="all" ? "Tu glosario está vacío" : `No hay vocabulario guardado de la página ${reviewPage}`}</h2>
 
 <p>
-Guarda palabras desde la lectura para comenzar.
+${reviewPage==="all" ? "Guarda palabras desde la lectura para comenzar." : "Vuelve a esa página, guarda las palabras que quieras estudiar e inténtalo de nuevo."}
 </p>
 
 </div>
@@ -5765,7 +5846,8 @@ async function loadCloudProgress(user){
       localStorage.setItem(STORAGE_KEY,JSON.stringify(glossary));
       localStorage.setItem("readerPageV4",page);
     }
-    renderReading();renderGlossary();updateCount();
+    normalizeGlossaryPages();
+    renderReading();renderGlossary();updateCount();populateReviewPageSelect();
     await saveCloudProgress();
   }catch(e){ setSyncStatus("Sin conexión · guardado local"); }
 }
@@ -5824,6 +5906,8 @@ if("serviceWorker" in navigator){ window.addEventListener("load",()=>navigator.s
 /* ==================================================
    INICIO
 ================================================== */
+normalizeGlossaryPages();
+populateReviewPageSelect();
 renderReading();
 renderGlossary();
 updateCount();
