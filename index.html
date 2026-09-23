@@ -504,6 +504,25 @@ body.review-focus > header{display:none;}
   font:inherit;
   font-weight:750;
 }
+
+.review-page-filter-visible{
+  position:fixed;
+  top:14px;
+  right:18px;
+  z-index:530;
+  width:190px;
+  margin:0;
+  padding:7px 9px;
+  background:#fff;
+  box-shadow:0 4px 16px rgba(0,0,0,.08);
+}
+.review-page-filter-visible label{
+  margin-bottom:3px;
+  font-size:10px;
+}
+.review-page-filter-visible select{
+  padding:7px 9px;
+}
 .practice-status{
   max-width:680px;
   width:100%;
@@ -707,6 +726,8 @@ body.review-focus > header{display:none;}
   }
   .review-menu-toggle{top:12px;left:12px;width:48px;height:48px;font-size:25px;}
   .review-mode-title{top:23px;font-size:16px;max-width:62vw;overflow:hidden;text-overflow:ellipsis;}
+  .review-page-filter-visible{top:76px;right:12px;left:12px;width:auto;}
+  .review-stage{padding-top:150px;}
   .question-label{font-size:19px;}
   .question-main{font-size:48px;margin:22px 8px;}
   .question-secondary{font-size:21px;}
@@ -964,17 +985,17 @@ Las palabras que guardes se utilizarán automáticamente en los ejercicios.
 <button class="review-menu-toggle" onclick="toggleReviewMenu()" aria-label="Abrir menú">☰</button>
 <div id="reviewModeTitle" class="review-mode-title">🎯 Opción múltiple</div>
 
+<div class="review-page-filter review-page-filter-visible">
+  <label for="reviewPageSelect">REPASAR PÁGINA</label>
+  <select id="reviewPageSelect" onchange="setReviewPage(this.value)"></select>
+</div>
+
 <div id="reviewMenuBackdrop" class="review-menu-backdrop" onclick="closeReviewMenu()"></div>
 
 <nav id="reviewMenu" class="review-menu" aria-label="Menú de repaso">
   <div class="review-menu-header">
     <strong>🧠 Repasar</strong>
     <button class="review-menu-close" onclick="closeReviewMenu()" aria-label="Cerrar menú">×</button>
-  </div>
-
-  <div class="review-page-filter">
-    <label for="reviewPageSelect">VOCABULARIO PARA REPASAR</label>
-    <select id="reviewPageSelect" onchange="setReviewPage(this.value)"></select>
   </div>
 
   <button class="mode-btn review-menu-item active" onclick="setMode('multiple',this)">🎯 <span>Opción múltiple</span></button>
