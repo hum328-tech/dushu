@@ -4640,11 +4640,10 @@ function normalizeGlossaryPages(){
 function populateReviewPageSelect(){
   const select=document.getElementById("reviewPageSelect");
   if(!select) return;
-  const availablePages=[...new Set(
-    Object.values(glossary).flatMap(item=>
-      Array.isArray(item.pages) && item.pages.length ? item.pages : inferredPagesForWord(item.word)
-    )
-  )].sort((a,b)=>a-b);
+
+  // Mostrar siempre todas las páginas disponibles en la lectura,
+  // aunque todavía no haya palabras guardadas de alguna de ellas.
+  const availablePages=[...new Set(readings.map(reading=>reading.page))].sort((a,b)=>a-b);
 
   select.innerHTML=`<option value="all">Todas las páginas</option>`+
     availablePages.map(pageNumber=>`<option value="${pageNumber}">Página ${pageNumber}</option>`).join("");
