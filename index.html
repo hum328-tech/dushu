@@ -814,6 +814,47 @@ body.review-focus > header{display:none;}
 .sync-status{font-size:11px;color:var(--muted)}
 @media(max-width:900px){.account-tools{gap:4px}.install-btn,.account-btn{padding:7px 8px}.sync-status{display:none}}
 
+/* ===== ESCRITURA A MANO EN CELULAR ===== */
+.handwriting-instructions{
+  max-width:680px;
+  margin-left:auto;
+  margin-right:auto;
+  font-size:18px;
+}
+.handwriting-pad-mobile{
+  width:min(520px,100%);
+  max-width:520px;
+  aspect-ratio:1;
+  margin:18px auto;
+  overflow:hidden;
+}
+.handwriting-pad-mobile canvas{
+  display:block;
+  width:100%;
+  height:100%;
+  touch-action:none;
+  -ms-touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-touch-callout:none;
+}
+@media(max-width:900px){
+  .handwriting-pad-mobile{
+    width:min(92vw,520px);
+    max-width:none;
+    aspect-ratio:1;
+  }
+  .handwriting-prompt{
+    font-size:36px;
+    margin-top:14px;
+    margin-bottom:14px;
+  }
+  .handwriting-instructions{
+    font-size:16px;
+    margin-bottom:16px;
+  }
+}
+
 </style>
 </head>
 
@@ -1003,7 +1044,7 @@ Las palabras que guardes se utilizarán automáticamente en los ejercicios.
   <button class="mode-btn review-menu-item" onclick="setMode('listening',this)">🎧 <span>Escuchar</span></button>
   <button class="mode-btn review-menu-item" onclick="setMode('pronunciation',this)">🎙️ <span>Pronunciar</span></button>
   <button class="mode-btn review-menu-item" onclick="setMode('character',this)">✍️ <span>Caracteres</span></button>
-  <button class="mode-btn review-menu-item" onclick="setMode('wordWriting',this)">🀄 <span>Palabras</span></button>
+  <button class="mode-btn review-menu-item" onclick="setMode('wordWriting',this)">✍️ <span>Escribir a mano</span></button>
   <button class="mode-btn review-menu-item" onclick="setMode('wordList',this)">📋 <span>Lista de palabras</span></button>
 
   <div class="review-menu-divider"></div>
@@ -4742,7 +4783,7 @@ function practiceStatusHTML(words=null,practiceMode=mode){
 
 function currentWordProgressHTML(word=currentWord,practiceMode=mode){
   if(!word) return "";
-  return `<div class="current-word-progress">${word.word} ${masteryDots(word.word,practiceMode)}</div>`;
+  return `<div class="current-word-progress">${masteryDots(word.word,practiceMode)}</div>`;
 }
 
 function recordAnswer(ok){
@@ -5049,18 +5090,6 @@ zhToEs
 ${question}
 </div>
 
-${
-zhToEs
-?
-`
-<div class="question-secondary">
-${currentWord.pinyin}
-</div>
-`
-:
-""
-}
-
 <div class="options">
 
 ${
@@ -5169,18 +5198,6 @@ zhToEs
 <div class="question-main">
 ${question}
 </div>
-
-${
-zhToEs
-?
-`
-<div class="question-secondary">
-${currentWord.pinyin}
-</div>
-`
-:
-""
-}
 
 <div class="answer-area">
 
@@ -5678,45 +5695,36 @@ ${practiceStatusHTML()}
 ${currentWordProgressHTML()}
 
 <div class="question-label">
-Escribe esta palabra
+✍️ Escribe la palabra en chino
 </div>
 
-<div class="question-main">
+<div class="question-main handwriting-prompt">
 ${currentWord.translation}
 </div>
 
-<div class="question-secondary">
-${currentWord.pinyin}
+<div class="question-secondary handwriting-instructions">
+Escribe la palabra completa con el dedo, Apple Pencil, stylus o mouse.<br>
+Los caracteres y el pinyin están ocultos hasta que pulses <strong>Mostrar respuesta</strong>.
 </div>
 
-<div style="
-text-align:center;
-font-size:40px;
-letter-spacing:15px;
-opacity:.15;
-margin:20px;
-">
-${currentWord.word}
-</div>
-
-<div class="writing-pad">
+<div class="writing-pad handwriting-pad-mobile">
 <canvas id="writingCanvas"></canvas>
 </div>
 
 <div class="answer-area">
 
 <button
-class="primary-btn"
+class="secondary-btn-wide"
 onclick="clearCanvas()"
 >
-🧹 Borrar
+🧹 Borrar y volver a intentar
 </button>
 
 <button
 class="primary-btn"
 onclick="revealWord()"
 >
-Mostrar respuesta
+👁️ Mostrar respuesta
 </button>
 
 </div>
