@@ -942,56 +942,6 @@ body.review-focus > header{display:none;}
   }
 }
 
-/* ===== BARRA DE TARJETAS V2 ===== */
-.flashcard-toolbar{
-  width:min(720px,100%);
-  margin:0 auto 14px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-}
-.flashcard-back-btn{
-  border:1px solid var(--border);
-  background:#fff;
-  padding:11px 16px;
-  border-radius:11px;
-  font-weight:850;
-  cursor:pointer;
-}
-.flashcard-counter-box{
-  display:flex;
-  align-items:baseline;
-  gap:7px;
-  padding:9px 13px;
-  border-radius:12px;
-  background:var(--primarySoft);
-  color:var(--primary);
-  text-align:right;
-}
-.flashcard-counter-box strong{
-  font-size:22px;
-}
-.flashcard-counter-box span{
-  font-size:13px;
-  font-weight:800;
-}
-@media(max-width:600px){
-  .flashcard-toolbar{
-    align-items:stretch;
-  }
-  .flashcard-back-btn{
-    flex:0 0 auto;
-  }
-  .flashcard-counter-box{
-    flex:1;
-    justify-content:flex-end;
-  }
-  .flashcard-counter-box span{
-    font-size:12px;
-  }
-}
-
 </style>
 </head>
 
@@ -5161,23 +5111,11 @@ function nextFlashcardWord(words){
 
 function flashcardQuestion(){
 
-const words=reviewWords();
 const pageText=reviewPage==="all" ? "Todas las páginas" : `Página ${reviewPage}`;
-const totalCards=words.length;
-const currentIndex=currentWord ? Math.max(0,words.findIndex(item=>item.word===currentWord.word))+1 : 1;
 
 document.getElementById("quizCard").innerHTML=`
 
-<div class="flashcard-toolbar">
-  <button class="flashcard-back-btn" onclick="backToReviewMenu()">← Ir atrás</button>
-
-  <div class="flashcard-counter-box">
-    <strong>${totalCards}</strong>
-    <span>${totalCards===1 ? "tarjeta" : "tarjetas"} en ${pageText.toLowerCase()}</span>
-  </div>
-</div>
-
-<div class="flashcard-page-note">${pageText} · ${totalCards} ${totalCards===1 ? "palabra" : "palabras"} guardadas</div>
+<div class="flashcard-page-note">${pageText}</div>
 
 <div id="studyFlashcard" class="study-flashcard" onclick="flipStudyFlashcard()">
   <div id="flashcardFront" class="study-flashcard-face">
@@ -5202,16 +5140,6 @@ Toca la tarjeta para ver la respuesta
 
 `;
 
-}
-
-function backToReviewMenu(){
-  const btn=document.querySelector('.review-menu-item[onclick*="multiple"]');
-  if(btn){
-    setMode("multiple",btn);
-  }else{
-    mode="multiple";
-    newQuestion();
-  }
 }
 
 function flipStudyFlashcard(){
