@@ -855,6 +855,93 @@ body.review-focus > header{display:none;}
   }
 }
 
+/* ===== TARJETAS DE REPASO ===== */
+.study-flashcard{
+  width:min(720px,100%);
+  min-height:390px;
+  margin:10px auto 18px;
+  border:2px solid var(--border);
+  border-radius:24px;
+  background:#fff;
+  box-shadow:0 10px 30px rgba(0,0,0,.07);
+  cursor:pointer;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+}
+.study-flashcard-face{
+  min-height:390px;
+  padding:34px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+}
+.flashcard-word-only{
+  font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:clamp(58px,10vw,105px);
+  font-weight:900;
+  line-height:1.2;
+}
+.flashcard-back-word{
+  font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:58px;
+  font-weight:900;
+}
+.flashcard-back-pinyin{
+  margin-top:12px;
+  font-size:27px;
+  color:#55749c;
+}
+.flashcard-back-translation{
+  margin-top:18px;
+  max-width:620px;
+  font-size:26px;
+  line-height:1.45;
+  font-weight:750;
+}
+.flashcard-audio{
+  width:72px;
+  height:72px;
+  margin:24px auto 0;
+  font-size:28px;
+}
+.flashcard-hint{
+  text-align:center;
+  color:var(--muted);
+  font-size:14px;
+  font-weight:750;
+  margin-bottom:18px;
+}
+.flashcard-page-note{
+  text-align:center;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+  margin-bottom:14px;
+}
+@media(max-width:900px){
+  .study-flashcard,
+  .study-flashcard-face{
+    min-height:52vh;
+  }
+  .study-flashcard-face{
+    padding:24px 18px;
+  }
+  .flashcard-word-only{
+    font-size:clamp(54px,18vw,90px);
+  }
+  .flashcard-back-word{
+    font-size:52px;
+  }
+  .flashcard-back-pinyin{
+    font-size:23px;
+  }
+  .flashcard-back-translation{
+    font-size:22px;
+  }
+}
+
 </style>
 </head>
 
@@ -1039,6 +1126,7 @@ Las palabras que guardes se utilizarán automáticamente en los ejercicios.
     <button class="review-menu-close" onclick="closeReviewMenu()" aria-label="Cerrar menú">×</button>
   </div>
 
+  <button class="mode-btn review-menu-item" onclick="setMode('flashcards',this)">🃏 <span>Tarjetas</span></button>
   <button class="mode-btn review-menu-item active" onclick="setMode('multiple',this)">🎯 <span>Opción múltiple</span></button>
   <button class="mode-btn review-menu-item" onclick="setMode('typing',this)">⌨️ <span>Escribir</span></button>
   <button class="mode-btn review-menu-item" onclick="setMode('listening',this)">🎧 <span>Escuchar</span></button>
@@ -4637,6 +4725,7 @@ function exitReviewToReading(){
 
 function updateReviewModeTitle(){
   const labels={
+    flashcards:"🃏 Tarjetas",
     multiple:"🎯 Opción múltiple",
     typing:"⌨️ Escribir",
     listening:"🎧 Escuchar",
@@ -4955,6 +5044,12 @@ renderWordList();
 return;
 }
 
+if(mode==="flashcards"){
+currentWord=nextFlashcardWord(words);
+flashcardQuestion();
+return;
+}
+
 const stats=sessionStats(words,mode);
 if(stats.finished){
 showFinished(words);
@@ -4991,6 +5086,77 @@ if(mode==="wordWriting"){
 wordWritingQuestion();
 }
 
+}
+
+
+
+/* ==================================================
+   TARJETAS
+   Frente: SOLO la palabra china.
+   Reverso: pinyin + significado.
+================================================== */
+
+let flashcardLastWord="";
+
+function nextFlashcardWord(words){
+  if(!words.length) return null;
+  let candidates=words;
+  if(words.length>1 && flashcardLastWord){
+    candidates=words.filter(item=>item.word!==flashcardLastWord);
+  }
+  const chosen=candidates[Math.floor(Math.random()*candidates.length)] || words[0];
+  flashcardLastWord=chosen.word;
+  return chosen;
+}
+
+function flashcardQuestion(){
+
+const pageText=reviewPage==="all" ? "Todas las páginas" : `Página ${reviewPage}`;
+
+document.getElementById("quizCard").innerHTML=`
+
+<div class="flashcard-page-note">${pageText}</div>
+
+<div id="studyFlashcard" class="study-flashcard" onclick="flipStudyFlashcard()">
+  <div id="flashcardFront" class="study-flashcard-face">
+    <div class="flashcard-word-only">${currentWord.word}</div>
+  </div>
+
+  <div id="flashcardBack" class="study-flashcard-face study-flashcard-back" style="display:none">
+    <div class="flashcard-back-word">${currentWord.word}</div>
+    <div class="flashcard-back-pinyin">${currentWord.pinyin || ""}</div>
+    <div class="flashcard-back-translation">${currentWord.translation || ""}</div>
+    <button class="big-audio-btn flashcard-audio" onclick="event.stopPropagation();speak('${currentWord.word.replace(/'/g,"\\'")}')">🔊</button>
+  </div>
+</div>
+
+<div class="flashcard-hint" id="flashcardHint">
+Toca la tarjeta para ver la respuesta
+</div>
+
+<div class="answer-area">
+  <button class="primary-btn" onclick="newQuestion()">Siguiente tarjeta →</button>
+</div>
+
+`;
+
+}
+
+function flipStudyFlashcard(){
+  const front=document.getElementById("flashcardFront");
+  const back=document.getElementById("flashcardBack");
+  const hint=document.getElementById("flashcardHint");
+  if(!front || !back) return;
+
+  const showingFront=front.style.display!=="none";
+  front.style.display=showingFront ? "none" : "flex";
+  back.style.display=showingFront ? "flex" : "none";
+
+  if(hint){
+    hint.textContent=showingFront
+      ? "Toca otra vez para volver a ver solo la palabra"
+      : "Toca la tarjeta para ver la respuesta";
+  }
 }
 
 
